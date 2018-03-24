@@ -1,0 +1,2 @@
+model_checkpoint_path: "shallow.ckpt"
+all_model_checkpoint_paths: "shallow.ckpt"
