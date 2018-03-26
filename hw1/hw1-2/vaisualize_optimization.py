@@ -97,8 +97,8 @@ for i in range(8):
     U = np.dot(S, S.transpose())
     eig_val, eig_vec = LA.eigh(U)
     
-    sort_order = np.sort(eig_val)[::-1]
-    W = (eig_vec[sort_order])[:,2]
+    sort_order = np.argsort(eig_val)[::-1]
+    W = (eig_vec[sort_order])[:,0:2]
     
     points = np.dot(weights, W)
     points_record.append(points)
@@ -109,6 +109,10 @@ colormap = plt.cm.gist_ncar
 colorst = [colormap(i) for i in np.linspace(0, 0.9,8)]
 
 fig = plt.figure(1)
+plt.title('Visualize Optimization')
+plt.xlabel('PCA_1')
+plt.ylabel('PCA_2')
+
 ax = fig.add_subplot(111)
 
 for i in range(8):
@@ -116,7 +120,16 @@ for i in range(8):
     ax.scatter(x, y, alpha=0.5, c= colorst[i])
     for idx in range(len(x)):
         ax.annotate(str(train_acc_record[i][idx]), (x[idx], y[idx]))
-
+plt.legend(['train_1',
+            'train_2',
+            'train_3',
+            'train_4',
+            'train_5',
+            'train_6',
+            'train_7',
+            'train_8'], loc='lower right')
+    
+fig.savefig('Visualize Optimization.png')
 
 
 
