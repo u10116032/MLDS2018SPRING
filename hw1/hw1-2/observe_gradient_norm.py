@@ -12,7 +12,7 @@ import utils
 from model import Model, SimulateFunctionModel
 import numpy as np
 
-EPOCH = 300
+EPOCH = 150
 batch_size = 200
 train_data_size = 5000
 
@@ -81,7 +81,7 @@ with tf.Session(graph= graph) as sess:
 #%%
 import matplotlib.pyplot as plt
 fig1= plt.figure(1)
-plt.title('MNIST')
+plt.suptitle('MNIST')
 plt.subplot(2, 1, 1)
 plt.xlabel('Epoch')
 plt.ylabel('Gradient')
@@ -152,7 +152,7 @@ with tf.Session(graph= graph) as sess:
 #%%
 import matplotlib.pyplot as plt
 fig2= plt.figure(2)
-plt.title('$x^{5}-x^{4}+x^{3}-x^{2}+x-1$')
+plt.suptitle('$x^{5}-x^{4}+x^{3}-x^{2}+x-1$')
 plt.subplot(2, 1, 1)
 plt.xlabel('Epoch')
 plt.ylabel('Gradient')
