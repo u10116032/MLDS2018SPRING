@@ -35,9 +35,10 @@ def dense(input, weight_shape, name, reuse, activation= 'relu'):
     shape = np.asarray(weight_shape)
     with tf.variable_scope(name, reuse= reuse):
         
-        weight = tf.get_variable('weight', 
-                     shape= shape,
-                     initializer=tf.truncated_normal_initializer(stddev=0.02))
+        flatten_weight = tf.get_variable('flatten_weight',
+                         shape= np.prod(shape),
+                         initializer=tf.truncated_normal_initializer(stddev=0.02))
+        weight = tf.reshape(flatten_weight, shape, name= 'weight')
         bias = tf.get_variable('bias',
                      shape= shape[-1],
                      initializer= tf.constant_initializer(0))
