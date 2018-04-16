@@ -11,6 +11,7 @@ from rnn_models import RnnModel
 import numpy as np
 from dataset import DataSet
 import data_preprocessing as DP
+import argparse
 
 
 ##### Training file path #####
@@ -157,5 +158,20 @@ def run_test():
             break # for testing
             
 if __name__ == '__main__':
-    run_train()
+    parser = argparse.ArgumentParser(description= 'sequence to sequence model')
+    parser.add_argument('--train',
+                        type= bool,
+                        default= False,
+                        help= 'train task')
+    parser.add_argument('--test',
+                        type= bool,
+                        default= False,
+                        help= 'test task')
+    arg = parser.parse_args()
+    if arg.train == True:
+        run_train()
+    if arg.test == True:
+        run_test()
+        
+    
     
