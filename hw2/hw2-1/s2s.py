@@ -12,7 +12,8 @@ import numpy as np
 from dataset import DataSet
 import data_preprocessing as DP
 import argparse
-
+import json
+import os
 
 ##### Training file path #####
 
@@ -21,7 +22,7 @@ train_label_file = './translated_training_label.json'
 train_path = './MLDS_hw2_1_data/training_data/feat/'
 test_path = './MLDS_hw2_1_data/testing_data/feat/'
 test_id_path = './MLDS_hw2_1_data/testing_id.txt'
-model_file = './s2vt/model.ckpt'
+model_file = './s2s/model.ckpt'
 
 ##############################
 
@@ -37,15 +38,15 @@ UNK_tag = '<UNK>'
 
 batch_size = 100
 N_hidden = 256
-N_epoch = 100
+N_epoch = 5
 max_seq_len = 30
 
 params = {}
 params['cell_type'] = 'lstm'
-params['batch_size'] = 100
-params['learning_rate'] = 0.001
+params['batch_size'] = batch_size
+params['learning_rate'] = 0.002
 params['hidden_layers'] = 1
-params['dropout'] = 0.1
+params['dropout'] = 0.0
 
 ######################
 
@@ -53,15 +54,13 @@ def run_train():
     # Inputs
     dictionary = DP.read_dictionary(dict_file)
     train_label = DP.read_train(train_label_file)
-    train = DataSet(train_path, train_label, len(dictionary), dictionary[EOS_tag])
-    
+    train = DataSet(train_path, train_label, len(dictionary), dictionary[BOS_tag], dictionary[EOS_tag])    
     
     # Parameters
     N_input = train.datalen
     N_iter = N_input * N_epoch // batch_size
     print('Total training steps: %d' % N_iter)
-    
-    
+        
     # Model
     graph = tf.Graph()
     with graph.as_default():
@@ -81,11 +80,10 @@ def run_train():
         
         while step < N_iter:
             batch_x, batch_y = train.next_batch(batch_size=batch_size)
-            y = np.full((batch_size, train.max_seq_len + 1), dictionary[EOS_tag])
+            y = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
             
             for i, caption in enumerate(batch_y):
-                y[i,0] = dictionary[BOS_tag]
-                y[i,1 :len(caption) + 1] = caption
+                y[i,:len(caption)] = caption
             
             feed_dict = {tf_video: batch_x, tf_decoder_input: y[:, :-1], tf_decoder_target: y[:, 1:]}
             _, train_loss = sess.run([train_step, loss], feed_dict=feed_dict)
@@ -151,27 +149,31 @@ def run_test():
                 if word == EOS_tag:
                     break
                 
-                caption['caption'].append(inverse_dictionary[pred])
+                caption['caption'].append(word)
             
             caption['caption'] = caption['caption'][1:]
             result.append(caption)
-            break # for testing
             
+        return result
+    
+def write_result(data):
+    folder = os.path.dirname(model_file) + '/'
+    with open(folder + 'result.json', 'w') as f:
+        json.dump(data, f, sort_keys= True, indent= 4)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= 'sequence to sequence model')
     parser.add_argument('--train',
-                        type= bool,
-                        default= False,
+                        action= 'store_true',
                         help= 'train task')
     parser.add_argument('--test',
-                        type= bool,
-                        default= False,
+                        action= 'store_true',
                         help= 'test task')
     arg = parser.parse_args()
-    if arg.train == True:
+    if arg.train:
         run_train()
-    if arg.test == True:
-        run_test()
+    if arg.test:
+        result = run_test()
+        write_result(result)
         
-    
     

@@ -70,35 +70,34 @@ class RnnModel:
         decoder_target = tf.placeholder(dtype=tf.int32, 
                 shape=[self.batch_size, None])
 
-        
+        # Embeded image_feat size to N_hidden
         video_flatten = tf.reshape(video, (-1, self.image_dim))
         image_embeded = tf.matmul(video_flatten, self.image_weight) + self.image_bias
         image_embeded = tf.reshape(image_embeded, (-1, self.N_video_step, self.N_hidden))
-        
+        image_embeded = tf.nn.relu(image_embeded)
         
         # RNN parameters
-        zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
-        
-        
-        # Encoding 
+        zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)       
+
+        # Encoding Stage
         ## final state = (c, h), where c and h = (batch_size, N_hidden)
         ## outputs = (batch_size, max_seq_len, N_hidden)
         with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
             encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= zero_state)
         
-        # Decoding
-        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):
-            decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
-            
+        # Decoding Stage
+        decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
+        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):   
             decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= encoder_final_state)
         
-        
+        # Project N_hidden into vocab_size        
         decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
+        
+        # Sample
         decoder_predict = tf.argmax(decoder_logits, dimension= 2)
-        
-        
+                
         # Loss
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                 labels= tf.one_hot(decoder_target, depth= self.vocab_size, dtype=tf.float32),

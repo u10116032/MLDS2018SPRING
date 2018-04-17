@@ -9,7 +9,7 @@ Created on Sun Apr 15 12:13:17 2018
 import numpy as np
 
 class DataSet:
-    def __init__(self, data_path, captions, vocab_size, EOS_tag):
+    def __init__(self, data_path, captions, vocab_size, BOS_tag, EOS_tag):
         self._feat = []
         self._label = []
         self._caption = []
@@ -22,6 +22,7 @@ class DataSet:
             for sentence in caption['caption']:
                 self._label.append(idx)
                 sentence.append(EOS_tag)
+                sentence = [BOS_tag] + sentence
                 self._caption.append(sentence)
                 if self._max_seq_len < len(sentence):
                     self._max_seq_len = len(sentence)
