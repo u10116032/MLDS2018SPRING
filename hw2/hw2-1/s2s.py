@@ -38,8 +38,9 @@ UNK_tag = '<UNK>'
 
 batch_size = 100
 N_hidden = 256
-N_epoch = 5
+N_epoch = 10
 max_seq_len = 30
+save_step = 10
 
 params = {}
 params['cell_type'] = 'lstm'
@@ -72,7 +73,7 @@ def run_train():
                         N_video_step = train.feat_timestep,
                         N_caption_step = train.max_seq_len,
                         **params)
-        tf_video, tf_decoder_input, tf_decoder_target, loss, train_step, decoder_predict = train_model.build_model()
+        tf_video, tf_decoder_input, tf_decoder_target, loss, train_step, predict_probs = train_model.build_model()
         
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
@@ -81,7 +82,6 @@ def run_train():
         while step < N_iter:
             batch_x, batch_y = train.next_batch(batch_size=batch_size)
             y = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
-            
             for i, caption in enumerate(batch_y):
                 y[i,:len(caption)] = caption
             
@@ -89,6 +89,9 @@ def run_train():
             _, train_loss = sess.run([train_step, loss], feed_dict=feed_dict)
             step += 1
             print('step: %d, train_loss: %f' % (step, train_loss))
+            
+            if (step % save_step) == 0:
+                train_model.save_model(sess, model_file)
             
         train_model.save_model(sess, model_file)
             
@@ -128,7 +131,7 @@ def run_test():
                         N_caption_step = max_seq_len,
                         **params)
         
-        tf_video, tf_decoder_input, tf_decoder_target, loss, _, decoder_predict = test_model.build_model()
+        tf_video, tf_decoder_input, tf_decoder_target, loss, _, predict_probs = test_model.build_model()
     
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
@@ -139,13 +142,13 @@ def run_test():
             caption = {}
             caption['caption'] = [BOS_tag]
             caption['id'] = ID[idx]
-            
+            x=features[55]
             x = x.reshape(1, feat_timestep, feat_dim)
             for _ in range(max_seq_len):
                 last_word = np.array([dictionary[caption['caption'][-1]]]).reshape(1, 1)
                 feed_dict = {tf_video: x, tf_decoder_input: last_word}
-                pred = sess.run(decoder_predict, feed_dict= feed_dict)[0][0]
-                word = inverse_dictionary[pred]
+                probs = sess.run(predict_probs, feed_dict= feed_dict)[0][0]
+                word = inverse_dictionary[np.random.choice(vocab_size, p= probs)]
                 if word == EOS_tag:
                     break
                 
@@ -154,6 +157,8 @@ def run_test():
             caption['caption'] = caption['caption'][1:]
             result.append(caption)
             
+            if idx >10: # for testing
+                break 
         return result
     
 def write_result(data):
@@ -162,6 +167,7 @@ def write_result(data):
         json.dump(data, f, sort_keys= True, indent= 4)
 
 if __name__ == '__main__':
+    
     parser = argparse.ArgumentParser(description= 'sequence to sequence model')
     parser.add_argument('--train',
                         action= 'store_true',
@@ -172,7 +178,7 @@ if __name__ == '__main__':
     arg = parser.parse_args()
     if arg.train:
         run_train()
-    if arg.test:
+    if arg.test:    
         result = run_test()
         write_result(result)
         

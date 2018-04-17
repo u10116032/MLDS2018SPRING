@@ -1,7 +1,6 @@
 import tensorflow as tf
 import os 
 
-
 class RnnModel:
     def __init__(self, is_training, image_dim, vocab_size, N_hidden, N_video_step, N_caption_step, **params):
 
@@ -95,8 +94,8 @@ class RnnModel:
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
         
-        # Sample
-        decoder_predict = tf.argmax(decoder_logits, dimension= 2)
+        # Prediction
+        predict_probs = tf.nn.softmax(decoder_logits)
                 
         # Loss
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
@@ -107,7 +106,7 @@ class RnnModel:
         optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
         train_step = optimizer.minimize(loss)
         
-        return video, decoder_input, decoder_target, loss, train_step, decoder_predict
+        return video, decoder_input, decoder_target, loss, train_step, predict_probs
         
     def save_model(self, sess, model_file):
         if not os.path.isdir(os.path.dirname(model_file)):

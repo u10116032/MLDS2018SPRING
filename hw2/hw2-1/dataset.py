@@ -37,17 +37,16 @@ class DataSet:
         self._index_in_epoch = 0
         self._N_epoch = 1
         
+        self.shuffle_data()
+        
     def next_batch(self, batch_size = 1):
         x = []
         y = []
         
         for _ in range(batch_size):
             if self._index_in_epoch >= self._datalen:
-                random_order = np.arange(self._datalen)
-                np.random.shuffle(random_order)
+                self.shuffle_data()
                 
-                self._label = self._label[random_order]
-                self._caption = self._caption[random_order]
                 self._index_in_epoch = 0
                 self._N_epoch += 1
             
@@ -56,6 +55,12 @@ class DataSet:
             self._index_in_epoch += 1
         
         return np.asarray(x), np.asarray(y)
+    
+    def shuffle_data(self):
+        random_order = np.arange(self._datalen)
+        np.random.shuffle(random_order)
+        self._label = self._label[random_order]
+        self._caption = self._caption[random_order]
     
     @property
     def feat(self):
