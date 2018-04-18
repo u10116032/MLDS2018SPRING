@@ -45,9 +45,9 @@ save_step = 20
 params = {}
 params['cell_type'] = 'lstm'
 params['batch_size'] = batch_size
-params['learning_rate'] = 0.02
+params['learning_rate'] = 0.001
 params['hidden_layers'] = 1
-params['dropout'] = 0.0
+params['dropout'] = 0.1
 
 ######################
 
