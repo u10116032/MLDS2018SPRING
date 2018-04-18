@@ -1,5 +1,5 @@
 import tensorflow as tf
-import os 
+import os
 
 class RnnModel:
     def __init__(self, is_training, image_dim, vocab_size, N_hidden, N_video_step, N_caption_step, **params):
@@ -10,14 +10,14 @@ class RnnModel:
         self.N_hidden = N_hidden # hidden layer size (hidden state dim)
         self.N_video_step = N_video_step # time_step: 80
         self.N_caption_step = N_caption_step # max sequence length
-        
+
         self.cell_type = params['cell_type']
         self.batch_size = params['batch_size']
         self.learning_rate = params['learning_rate']
         self.hidden_layers = params['hidden_layers']
         self.dropout = params['dropout']
-        
-        
+
+
         if self.cell_type == 'rnn':
             cell_fn = tf.contrib.rnn.BasicRNNCell
         elif self.cell_type == 'lstm':
@@ -32,7 +32,7 @@ class RnnModel:
         if is_training and self.dropout > 0:
             cells = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob= 1.0 - self.dropout) for cell in cells]
         self.encoder_multi_cells = tf.contrib.rnn.MultiRNNCell(cells)
-        
+
         cells = []
         for _ in range(self.hidden_layers):
             cells.append(cell_fn(self.N_hidden, reuse= tf.get_variable_scope().reuse))
@@ -40,8 +40,8 @@ class RnnModel:
         if is_training and self.dropout > 0:
             cells = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob= 1.0 - self.dropout) for cell in cells]
         self.decoder_multi_cells = tf.contrib.rnn.MultiRNNCell(cells)
-        
-        
+
+
         self.image_weight = tf.get_variable('image_weight',
                                   shape= (self.image_dim, self.N_hidden),
                                   initializer= tf.truncated_normal_initializer(stddev= 0.02))
@@ -58,36 +58,35 @@ class RnnModel:
                                   shape= (self.vocab_size),
                                   initializer= tf.constant_initializer())
         self.saver = tf.train.Saver(max_to_keep= 1)
-        
-        
-                                        
+
+
+
     def build_model(self, is_training= True):
         # Inputs
-        video = tf.placeholder(dtype=tf.float32, 
+        video = tf.placeholder(dtype=tf.float32,
                 shape=[self.batch_size, self.N_video_step, self.image_dim])
 
-        decoder_input = tf.placeholder(dtype=tf.int32, 
+        decoder_input = tf.placeholder(dtype=tf.int32,
                 shape=[self.batch_size, None])
-        decoder_target = tf.placeholder(dtype=tf.int32, 
+        decoder_target = tf.placeholder(dtype=tf.int32,
                 shape=[self.batch_size, None])
 
         # Embeded image_feat size to N_hidden
         video_flatten = tf.reshape(video, (-1, self.image_dim))
         image_embeded = tf.matmul(video_flatten, self.image_weight) + self.image_bias
         image_embeded = tf.reshape(image_embeded, (-1, self.N_video_step, self.N_hidden))
-        #image_embeded = tf.nn.relu(image_embeded)
-        
+
         # RNN parameters
-        zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)       
+        zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
 
         # Encoding Stage
         with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
             encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= zero_state)
-        
+
         # Decoding Stage
         decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
         with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):
-            if is_training:         
+            if is_training:
                 decoder_output_list = []
                 for i in range(self.N_caption_step - 1):
                     each_step_word_embeded = tf.reshape(decoder_input_embeded[:,i,:], (self.batch_size, 1, self.N_hidden))
@@ -95,19 +94,18 @@ class RnnModel:
                     decoder_output_list.append(tf.squeeze(decoder_output))
                 decoder_output_list = tf.stack(decoder_output_list, axis= 1)
             else:
-                #decoder_output_list = [] 
                 each_step_word_embeded = tf.reshape(decoder_input_embeded, (self.batch_size, 1, self.N_hidden))
                 decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, each_step_word_embeded, initial_state= encoder_final_state)
                 decoder_output_list = decoder_output
-        
-        # Project N_hidden into vocab_size        
+
+        # Project N_hidden into vocab_size
         decoder_output_flatten = tf.reshape(decoder_output_list, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
-        
+
         # Prediction
         predict_probs = tf.nn.softmax(decoder_logits)
-                
+
         # Loss
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                 labels= tf.one_hot(decoder_target, depth= self.vocab_size, dtype=tf.float32),
@@ -119,19 +117,19 @@ class RnnModel:
         clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
         train_step = optimizer.apply_gradients(clipped_gradients)
         #train_step = optimizer.minimize(loss)
-        
+
         return video, decoder_input, decoder_target, loss, train_step, predict_probs
-        
+
     def save_model(self, sess, model_file, step):
         if not os.path.isdir(os.path.dirname(model_file)):
             os.mkdir(os.path.dirname(model_file))
-        self.saver.save(sess, model_file)
-    
+        self.saver.save(sess, model_file, global_step= step)
+
     def restore_model(self, sess, model_file):
         step = 0
         checkpoint_dir = os.path.dirname(model_file)
         if os.path.isdir(checkpoint_dir):
-            '''
+            
             checkpoint = tf.train.get_checkpoint_state(checkpoint_dir)
             meta_graph_path = checkpoint.model_checkpoint_path + ".meta"
             restore = tf.train.import_meta_graph(meta_graph_path)
@@ -139,10 +137,6 @@ class RnnModel:
             step = int(meta_graph_path.split("-")[1].split(".")[0])
             '''
             self.saver.restore(sess, model_file)
-        
+            '''
+
         return step
-        
-        
-        
-        
-        
