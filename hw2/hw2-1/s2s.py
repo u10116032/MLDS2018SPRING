@@ -38,14 +38,14 @@ UNK_tag = '<UNK>'
 
 batch_size = 100
 N_hidden = 256
-N_epoch = 10
+N_epoch = 300
 max_seq_len = 30
 save_step = 10
 
 params = {}
 params['cell_type'] = 'lstm'
 params['batch_size'] = batch_size
-params['learning_rate'] = 0.002
+params['learning_rate'] = 0.001
 params['hidden_layers'] = 1
 params['dropout'] = 0.0
 
@@ -77,7 +77,7 @@ def run_train():
         
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
-        step = 0
+        step = train_model.restore_model(sess, model_file)
         
         while step < N_iter:
             batch_x, batch_y = train.next_batch(batch_size=batch_size)
@@ -91,9 +91,10 @@ def run_train():
             print('step: %d, train_loss: %f' % (step, train_loss))
             
             if (step % save_step) == 0:
-                train_model.save_model(sess, model_file)
+                train_model.save_model(sess, model_file, step)
+                print('----- Saving Model -----')
             
-        train_model.save_model(sess, model_file)
+        train_model.save_model(sess, model_file, step)
             
 
 def run_test():
@@ -131,24 +132,29 @@ def run_test():
                         N_caption_step = max_seq_len,
                         **params)
         
-        tf_video, tf_decoder_input, tf_decoder_target, loss, _, predict_probs = test_model.build_model()
+        tf_video, tf_decoder_input, tf_decoder_target, loss, _, predict_probs = test_model.build_model(is_training= False)
     
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
-        test_model.restore_model(sess, model_file)
-        
+        step = test_model.restore_model(sess, model_file)
+        print('Restore the model with step %d' % (step))
         result = []
         for idx, x in enumerate(features):
             caption = {}
             caption['caption'] = [BOS_tag]
             caption['id'] = ID[idx]
-            x=features[55]
+            
             x = x.reshape(1, feat_timestep, feat_dim)
             for _ in range(max_seq_len):
                 last_word = np.array([dictionary[caption['caption'][-1]]]).reshape(1, 1)
                 feed_dict = {tf_video: x, tf_decoder_input: last_word}
                 probs = sess.run(predict_probs, feed_dict= feed_dict)[0][0]
-                word = inverse_dictionary[np.random.choice(vocab_size, p= probs)]
+                
+                if arg.sampling:
+                    word_index = np.random.choice(vocab_size, p= probs)
+                else:
+                    word_index = np.argmax(probs)
+                word = inverse_dictionary[word_index]
                 if word == EOS_tag:
                     break
                 
@@ -171,10 +177,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= 'sequence to sequence model')
     parser.add_argument('--train',
                         action= 'store_true',
+                        default= False,
                         help= 'train task')
     parser.add_argument('--test',
                         action= 'store_true',
+                        default= False,
                         help= 'test task')
+    parser.add_argument('--sampling',
+                        action= 'store_true',
+                        default= False,
+                        help= 'test task')
+    
     arg = parser.parse_args()
     if arg.train:
         run_train()

@@ -57,9 +57,11 @@ class RnnModel:
         self.word_bias = tf.get_variable('word_bias',
                                   shape= (self.vocab_size),
                                   initializer= tf.constant_initializer())
+        self.saver = tf.train.Saver(max_to_keep= 1)
+        
         
                                         
-    def build_model(self):
+    def build_model(self, is_training= True):
         # Inputs
         video = tf.placeholder(dtype=tf.float32, 
                 shape=[self.batch_size, self.N_video_step, self.image_dim])
@@ -86,11 +88,23 @@ class RnnModel:
         
         # Decoding Stage
         decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
-        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):   
-            decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= encoder_final_state)
+        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):
+            if is_training:         
+                decoder_output_list = []
+                for i in range(self.N_caption_step - 1):
+                    each_step_word_embeded = tf.reshape(decoder_input_embeded[:,i,:], (self.batch_size, 1, self.N_hidden))
+                    decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, each_step_word_embeded, initial_state= encoder_final_state)
+                    decoder_output_list.append(tf.squeeze(decoder_output))
+                decoder_output_list = tf.stack(decoder_output_list, axis= 1)
+            else:
+                decoder_output_list = [] 
+                each_step_word_embeded = tf.reshape(decoder_input_embeded, (self.batch_size, 1, self.N_hidden))
+                decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, each_step_word_embeded, initial_state= encoder_final_state)
+                decoder_output_list.append(tf.squeeze(decoder_output))
+                decoder_output_list = tf.stack(decoder_output_list, axis= 1)
         
         # Project N_hidden into vocab_size        
-        decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
+        decoder_output_flatten = tf.reshape(decoder_output_list, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
         
@@ -104,20 +118,29 @@ class RnnModel:
 
         loss = tf.reduce_mean(stepwise_cross_entropy)
         optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
+        gradients = optimizer.compute_gradients(loss)
+        clipped_gradients = [(tf.clip_by_value(grad, -5., 5.), var) for grad, var in gradients]
+        train_step = optimizer.apply_gradients(clipped_gradients)
         train_step = optimizer.minimize(loss)
         
         return video, decoder_input, decoder_target, loss, train_step, predict_probs
         
-    def save_model(self, sess, model_file):
+    def save_model(self, sess, model_file, step):
         if not os.path.isdir(os.path.dirname(model_file)):
             os.mkdir(os.path.dirname(model_file))
-        saver = tf.train.Saver()
-        saver.save(sess, model_file)
+        self.saver.save(sess, model_file, global_step= step)
     
     def restore_model(self, sess, model_file):
-        if os.path.isdir(os.path.dirname(model_file)):
-            saver = tf.train.Saver()
-            saver.restore(sess, model_file)
+        step = 0
+        checkpoint_dir = os.path.dirname(model_file)
+        if os.path.isdir(checkpoint_dir):
+            checkpoint = tf.train.get_checkpoint_state(checkpoint_dir)
+            meta_graph_path = checkpoint.model_checkpoint_path + ".meta"
+            restore = tf.train.import_meta_graph(meta_graph_path)
+            restore.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
+            step = int(meta_graph_path.split("-")[1].split(".")[0])
+        
+        return step
         
         
         
