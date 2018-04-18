@@ -75,14 +75,12 @@ class RnnModel:
         video_flatten = tf.reshape(video, (-1, self.image_dim))
         image_embeded = tf.matmul(video_flatten, self.image_weight) + self.image_bias
         image_embeded = tf.reshape(image_embeded, (-1, self.N_video_step, self.N_hidden))
-        image_embeded = tf.nn.relu(image_embeded)
+        #image_embeded = tf.nn.relu(image_embeded)
         
         # RNN parameters
         zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)       
 
         # Encoding Stage
-        ## final state = (c, h), where c and h = (batch_size, N_hidden)
-        ## outputs = (batch_size, max_seq_len, N_hidden)
         with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
             encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= zero_state)
         
@@ -97,11 +95,10 @@ class RnnModel:
                     decoder_output_list.append(tf.squeeze(decoder_output))
                 decoder_output_list = tf.stack(decoder_output_list, axis= 1)
             else:
-                decoder_output_list = [] 
+                #decoder_output_list = [] 
                 each_step_word_embeded = tf.reshape(decoder_input_embeded, (self.batch_size, 1, self.N_hidden))
                 decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, each_step_word_embeded, initial_state= encoder_final_state)
-                decoder_output_list.append(tf.squeeze(decoder_output))
-                decoder_output_list = tf.stack(decoder_output_list, axis= 1)
+                decoder_output_list = decoder_output
         
         # Project N_hidden into vocab_size        
         decoder_output_flatten = tf.reshape(decoder_output_list, (-1, self.N_hidden))
@@ -119,26 +116,29 @@ class RnnModel:
         loss = tf.reduce_mean(stepwise_cross_entropy)
         optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
         gradients = optimizer.compute_gradients(loss)
-        clipped_gradients = [(tf.clip_by_value(grad, -5., 5.), var) for grad, var in gradients]
+        clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
         train_step = optimizer.apply_gradients(clipped_gradients)
-        train_step = optimizer.minimize(loss)
+        #train_step = optimizer.minimize(loss)
         
         return video, decoder_input, decoder_target, loss, train_step, predict_probs
         
     def save_model(self, sess, model_file, step):
         if not os.path.isdir(os.path.dirname(model_file)):
             os.mkdir(os.path.dirname(model_file))
-        self.saver.save(sess, model_file, global_step= step)
+        self.saver.save(sess, model_file)
     
     def restore_model(self, sess, model_file):
         step = 0
         checkpoint_dir = os.path.dirname(model_file)
         if os.path.isdir(checkpoint_dir):
+            '''
             checkpoint = tf.train.get_checkpoint_state(checkpoint_dir)
             meta_graph_path = checkpoint.model_checkpoint_path + ".meta"
             restore = tf.train.import_meta_graph(meta_graph_path)
             restore.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
             step = int(meta_graph_path.split("-")[1].split(".")[0])
+            '''
+            self.saver.restore(sess, model_file)
         
         return step
         

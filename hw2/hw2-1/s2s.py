@@ -20,8 +20,8 @@ import os
 dict_file = 'dictionary.txt'
 train_label_file = './translated_training_label.json'
 train_path = './MLDS_hw2_1_data/training_data/feat/'
-test_path = './MLDS_hw2_1_data/testing_data/feat/'
-test_id_path = './MLDS_hw2_1_data/testing_id.txt'
+test_path = './MLDS_hw2_1_data/training_data/feat/'
+test_id_path = './MLDS_hw2_1_data/training_id.txt'
 model_file = './s2s/model.ckpt'
 
 ##############################
@@ -37,15 +37,15 @@ UNK_tag = '<UNK>'
 ##### Parameters #####
 
 batch_size = 100
-N_hidden = 256
+N_hidden = 128
 N_epoch = 300
 max_seq_len = 30
-save_step = 10
+save_step = 20
 
 params = {}
 params['cell_type'] = 'lstm'
 params['batch_size'] = batch_size
-params['learning_rate'] = 0.001
+params['learning_rate'] = 0.02
 params['hidden_layers'] = 1
 params['dropout'] = 0.0
 
