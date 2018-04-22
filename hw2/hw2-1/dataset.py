@@ -49,7 +49,6 @@ class DataSet:
                 
                 self._index_in_epoch = 0
                 self._N_epoch += 1
-            print()
             x.append(self._feat[self._label[self._index_in_epoch]])
             y.append(self._caption[self._index_in_epoch])
             self._index_in_epoch += 1

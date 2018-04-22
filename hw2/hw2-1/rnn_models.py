@@ -61,7 +61,7 @@ class RnnModel:
 
 
 
-    def build_model(self, is_training= True):
+    def build_train_model(self):
         # Inputs
         video = tf.placeholder(dtype=tf.float32,
                 shape=[self.batch_size, self.N_video_step, self.image_dim])
@@ -77,35 +77,21 @@ class RnnModel:
         image_embeded = tf.reshape(image_embeded, (-1, self.N_video_step, self.N_hidden))
 
         # RNN parameters
-        zero_state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
+        state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
 
         # Encoding Stage
         with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
-            encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= zero_state)
+            encoder_outputs, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= state)
 
         # Decoding Stage
         decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
-        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):
-            
-            if is_training:
-                decoder_output_list = []
-                for i in range(self.N_caption_step - 1):
-                    each_step_word_embeded = tf.reshape(decoder_input_embeded[:,i,:], (self.batch_size, 1, self.N_hidden))
-                    decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, each_step_word_embeded, initial_state= encoder_final_state)
-                    decoder_output_list.append(tf.squeeze(decoder_output))
-                decoder_output_list = tf.stack(decoder_output_list, axis= 1)
-            else:
-                each_step_word_embeded = tf.reshape(decoder_input_embeded, (self.batch_size, 1, self.N_hidden))            
-                decoder_output, decoder_final_state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= encoder_final_state)
-                decoder_output_list = decoder_output
-
+        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):     
+            decoder_output, _ = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= state)
+                        
         # Project N_hidden into vocab_size
-        decoder_output_flatten = tf.reshape(decoder_output_list, (-1, self.N_hidden))
+        decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
-
-        # Prediction
-        predict_probs = tf.nn.softmax(decoder_logits)
 
         # Loss
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
@@ -117,9 +103,55 @@ class RnnModel:
         gradients = optimizer.compute_gradients(loss)
         clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
         train_step = optimizer.apply_gradients(clipped_gradients)
-        #train_step = optimizer.minimize(loss)
 
-        return video, decoder_input, decoder_target, loss, train_step, predict_probs
+        return video, decoder_input, decoder_target, loss, train_step
+ 
+    
+    def build_test_model(self, sampling= False):
+        # Inputs
+        video = tf.placeholder(dtype=tf.float32,
+                shape=[self.batch_size, self.N_video_step, self.image_dim])
+
+        decoder_input = tf.placeholder(dtype=tf.int32,
+                shape=[self.batch_size, None])
+
+        # Embeded image_feat size to N_hidden
+        video_flatten = tf.reshape(video, (-1, self.image_dim))
+        image_embeded = tf.matmul(video_flatten, self.image_weight) + self.image_bias
+        image_embeded = tf.reshape(image_embeded, (-1, self.N_video_step, self.N_hidden))
+
+        # RNN parameters
+        state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
+        captions = []
+        
+        # Encoding Stage
+        with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
+            encoder_outputs, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= state)
+
+        # Decoding Stage
+        decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
+        for idx in range(self.N_caption_step):
+            with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):     
+                decoder_output, state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= state)
+                            
+            # Project N_hidden into vocab_size
+            decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
+            decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
+            decoder_logits = tf.reshape(decoder_logits, (self.batch_size, self.vocab_size))
+            
+            probs = tf.nn.softmax(decoder_logits)
+            if sampling:
+                best_choice = tf.multinomial(tf.log(probs), 1)
+            else:
+                best_choice = tf.expand_dims(tf.argmax(decoder_logits, axis= 1), axis= -1)
+            best_choice = tf.cast(best_choice, dtype= tf.int32)
+            
+            decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, best_choice)
+            captions.append(best_choice)
+            
+        captions = tf.squeeze(tf.stack(captions, axis= 1))
+        return video, decoder_input, captions
+    
 
     def save_model(self, sess, model_file, step):
         if self.saver is None:
@@ -140,6 +172,7 @@ class RnnModel:
         return step
 
 #%%
+'''
 class AttentionalRnnModel:
     def __init__(self, is_training, image_dim, vocab_size, N_hidden, N_video_step, N_caption_step, **params):
 
@@ -298,3 +331,4 @@ class AttentionalRnnModel:
             step = int( checkpoint.model_checkpoint_path.split("-")[1].split(".")[0])
             self.saver.restore(sess,checkpoint.model_checkpoint_path)
         return step
+'''    
