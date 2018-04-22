@@ -37,8 +37,8 @@ UNK_tag = '<UNK>'
 ##### Parameters #####
 
 batch_size = 100
-N_hidden = 128
-N_epoch = 300
+N_hidden = 256
+N_epoch = 1000
 max_seq_len = 30
 save_step = 20
 
@@ -81,6 +81,7 @@ def run_train():
 
         while step < N_iter:
             batch_x, batch_y = train.next_batch(batch_size=batch_size)
+
             y = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
             for i, caption in enumerate(batch_y):
                 y[i,:len(caption)] = caption
@@ -138,6 +139,7 @@ def run_test():
         sess.run(tf.global_variables_initializer())
         step = test_model.restore_model(sess, model_file)
         print('Restore the model with step %d' % (step))
+        
         result = []
         for idx, x in enumerate(features):
             caption = {}
@@ -162,9 +164,10 @@ def run_test():
 
             caption['caption'] = caption['caption'][1:]
             result.append(caption)
-
+            
             if idx >10: # for testing
                 break
+            
         return result
 
 def write_result(data):
