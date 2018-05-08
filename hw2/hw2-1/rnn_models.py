@@ -234,19 +234,20 @@ class RnnModel_Attention:
                                   shape= (self.vocab_size),
                                   initializer= tf.truncated_normal_initializer(stddev= 0.02))
 
-    def attention(self, states, key):
-        states_flatten = tf.reshape(states_flatten, (-1, self.N_hidden))
+    def attention(self, states, last_key):
+        states_flatten = tf.reshape(states, (-1, self.N_hidden))
         states_flatten_normalized = tf.nn.l2_normalize(states_flatten, 1)
-        states_flatten_normalized = tf.matmul(states_flatten_normalized, tf.nn.l2_normalize(self.key))
+        scores = tf.matmul(states_flatten_normalized, tf.nn.l2_normalize(last_key))
         
-        states_flatten_normalized = tf.reshape(
-            states_flatten_normalized, 
+        next_key = tf.multiply(states_flatten, scores)
+        next_key = tf.reshape(
+            next_key, 
             (self.batch_size, -1, self.N_hidden)
         )
         
-        
-        
-
+        next_key = tf.reduce_sum(next_key, axis= 1)
+        return next_key
+    
 
     def build_train_model(self):
         # Inputs
