@@ -20,8 +20,8 @@ import os
 dict_file = 'dictionary.txt'
 train_label_file = './translated_training_label.json'
 train_path = './MLDS_hw2_1_data/training_data/feat/'
-test_path = './MLDS_hw2_1_data/training_data/feat/'
-test_id_path = './MLDS_hw2_1_data/training_id.txt'
+test_path = './MLDS_hw2_1_data/testing_data/feat/'
+test_id_path = './MLDS_hw2_1_data/testing_id.txt'
 model_file = './s2s/model.ckpt'
 
 ##############################
@@ -161,9 +161,6 @@ def run_test(sampling):
 
             caption['caption'] = caption['caption'][1:]
             result.append(caption)
-            
-            if idx >10: # for testing
-                break
             
         return result
 
