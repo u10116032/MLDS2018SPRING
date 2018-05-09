@@ -7,7 +7,7 @@ Created on Mon Apr 16 00:33:44 2018
 """
 
 import tensorflow as tf
-from rnn_models import RnnModel
+from rnn_models import RnnModel_Attention
 import numpy as np
 from dataset import DataSet
 import data_preprocessing as DP
@@ -20,9 +20,9 @@ import os
 dict_file = 'dictionary.txt'
 train_label_file = './translated_training_label.json'
 train_path = './MLDS_hw2_1_data/training_data/feat/'
-test_path = './MLDS_hw2_1_data/training_data/feat/'
-test_id_path = './MLDS_hw2_1_data/training_id.txt'
-model_file = './s2s/model.ckpt'
+test_path = './MLDS_hw2_1_data/testing_data/feat/'
+test_id_path = './MLDS_hw2_1_data/testing_id.txt'
+model_file = './s2s_attention/model.ckpt'
 
 ##############################
 
@@ -65,7 +65,7 @@ def run_train():
     # Model
     graph = tf.Graph()
     with graph.as_default():
-        train_model = RnnModel(
+        train_model = RnnModel_Attention(
                         is_training= True,
                         image_dim = train.feat_dim,
                         vocab_size = train.vocab_size,
@@ -73,7 +73,7 @@ def run_train():
                         N_video_step = train.feat_timestep,
                         N_caption_step = train.max_seq_len,
                         **params)
-        tf_video, tf_decoder_input, tf_decoder_target, loss, train_step, predict_probs = train_model.build_model()
+        tf_video, tf_decoder_input, tf_decoder_target, loss, train_step = train_model.build_train_model()
 
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
@@ -96,9 +96,10 @@ def run_train():
                 print('----- Saving Model -----')
 
         train_model.save_model(sess, model_file, step)
+        print('----- Saving Model -----')
 
 
-def run_test():
+def run_test(sampling):
     # Inputs
     dictionary = DP.read_dictionary(dict_file)
     inverse_dictionary = {dictionary[key]:key for key in dictionary}
@@ -124,7 +125,7 @@ def run_test():
     graph = tf.Graph()
     with graph.as_default():
         params['batch_size'] = 1
-        test_model = RnnModel(
+        test_model = RnnModel_Attention(
                         is_training= False,
                         image_dim = feat_dim,
                         vocab_size = vocab_size,
@@ -133,7 +134,7 @@ def run_test():
                         N_caption_step = max_seq_len,
                         **params)
 
-        tf_video, tf_decoder_input, tf_decoder_target, loss, _, predict_probs = test_model.build_model(is_training= False)
+        tf_video, tf_decoder_input, captions = test_model.build_test_model(sampling)
 
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
@@ -147,26 +148,19 @@ def run_test():
             caption['id'] = ID[idx]
 
             x = x.reshape(1, feat_timestep, feat_dim)
-            for _ in range(max_seq_len):
-                last_word = np.array([dictionary[caption['caption'][-1]]]).reshape(1, 1)
-                feed_dict = {tf_video: x, tf_decoder_input: last_word}
-                probs = sess.run(predict_probs, feed_dict= feed_dict)[0][0]
+            
+            begin = np.array([dictionary[caption['caption'][0]]]).reshape(1, 1)
+            feed_dict = {tf_video: x, tf_decoder_input: begin}
+            predictions = sess.run(captions, feed_dict= feed_dict)
 
-                if arg.sampling:
-                    word_index = np.random.choice(vocab_size, p= probs)
-                else:
-                    word_index = np.argmax(probs)
-                word = inverse_dictionary[word_index]
+            for word_idx in predictions:
+                word = inverse_dictionary[word_idx]
                 if word == EOS_tag:
                     break
-
                 caption['caption'].append(word)
 
             caption['caption'] = caption['caption'][1:]
             result.append(caption)
-            
-            if idx >10: # for testing
-                break
             
         return result
 
@@ -195,5 +189,5 @@ if __name__ == '__main__':
     if arg.train:
         run_train()
     if arg.test:
-        result = run_test()
+        result = run_test(arg.sampling)
         write_result(result)
