@@ -152,7 +152,6 @@ def run_test(sampling):
             begin = np.array([dictionary[caption['caption'][0]]]).reshape(1, 1)
             feed_dict = {tf_video: x, tf_decoder_input: begin}
             predictions = sess.run(captions, feed_dict= feed_dict)
-
             for word_idx in predictions:
                 word = inverse_dictionary[word_idx]
                 if word == EOS_tag:

@@ -251,7 +251,7 @@ class RnnModel_Attention:
         key_scores = tf.reshape(key_scores, (2, self.batch_size, self.N_hidden))
         
         image_states = tf.add(image_states, key_scores)
-        image_states = tf.transpose(tf.squeeze(image_states), [1, 2, 0, 3])
+        image_states = tf.transpose(tf.squeeze(image_states, [0]), [1, 2, 0, 3])
         image_states_flatten = tf.reshape(image_states, (-1, self.N_hidden))
         
         scores = tf.matmul(image_states_flatten, self.states_weight) + self.states_bias
@@ -341,29 +341,35 @@ class RnnModel_Attention:
         
         # Encoding Stage
         with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
-            encoder_outputs, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, image_embeded, initial_state= state)
+          image_states = []
+          for idx in range(self.N_video_step):
+            embeded = tf.expand_dims(image_embeded[:,idx,:], 1)
+            _, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, embeded, initial_state= state)
+            image_states.append(state)
+          image_states = tf.stack(image_states, 1)
 
         # Decoding Stage
         decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
-        for idx in range(self.N_caption_step):
-            with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):     
-                decoder_output, state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= state)
+        with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):   
+          for idx in range(self.N_caption_step):
+              state = self.attention(image_states, state)
+              decoder_output, state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= state)
                             
-            # Project N_hidden into vocab_size
-            decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
-            decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
-            decoder_logits = tf.reshape(decoder_logits, (self.batch_size, self.vocab_size))
-            
-            probs = tf.nn.softmax(decoder_logits)
-            if sampling:
-                best_choice = tf.multinomial(tf.log(probs), 1)
-            else:
-                best_choice = tf.expand_dims(tf.argmax(decoder_logits, axis= 1), axis= -1)
-            best_choice = tf.cast(best_choice, dtype= tf.int32)
-            
-            decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, best_choice)
-            captions.append(best_choice)
-            
+              # Project N_hidden into vocab_size
+              decoder_output_flatten = tf.reshape(decoder_output, (-1, self.N_hidden))
+              decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
+              decoder_logits = tf.reshape(decoder_logits, (self.batch_size, self.vocab_size))
+              
+              probs = tf.nn.softmax(decoder_logits)
+              if sampling:
+                  best_choice = tf.multinomial(tf.log(probs), 1)
+              else:
+                  best_choice = tf.expand_dims(tf.argmax(decoder_logits, axis= 1), axis= -1)
+              best_choice = tf.cast(best_choice, dtype= tf.int32)
+              captions.append(best_choice)
+              
+              decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, best_choice)
+
         captions = tf.squeeze(tf.stack(captions, axis= 1))
         return video, decoder_input, captions
     
