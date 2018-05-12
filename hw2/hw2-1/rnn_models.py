@@ -250,18 +250,19 @@ class RnnModel_Attention:
         key_scores = tf.matmul(key_flatten, self.key_weight) + self.key_bias
         key_scores = tf.reshape(key_scores, (2, self.batch_size, self.N_hidden))
         
-        image_states = tf.add(image_states, key_scores)
-        image_states = tf.transpose(tf.squeeze(image_states, [0]), [1, 2, 0, 3])
+        image_states = tf.add(tf.transpose(image_states, [1, 0, 2, 3]), key_scores)
+        image_states = tf.transpose(image_states, [1, 0, 2, 3])
         image_states_flatten = tf.reshape(image_states, (-1, self.N_hidden))
         
         scores = tf.matmul(image_states_flatten, self.states_weight) + self.states_bias
         scores = tf.reshape(scores,
-                    shape= (2, self.batch_size, -1, 1))
-        scores = tf.nn.softmax(scores, 2)
+                    shape= (2, -1, self.batch_size, 1))
+        scores = tf.nn.softmax(tf.transpose(scores, [0, 2, 1, 3]), 2)
+        scores = tf.transpose(scores, [0, 2, 1, 3])
         
         weighted_states = tf.multiply(image_states_flatten, tf.reshape(scores, (-1, 1)))
-        weighted_states = tf.reshape(weighted_states, (2, self.batch_size, -1, self.N_hidden))
-        weighted_states = tf.reduce_sum(weighted_states, 2)
+        weighted_states = tf.reshape(weighted_states, (2, -1, self.batch_size, self.N_hidden))
+        weighted_states = tf.reduce_sum(tf.transpose(weighted_states,[0, 2, 1, 3]), 2)
         
         return (tf.contrib.rnn.LSTMStateTuple(c= weighted_states[0], h= weighted_states[1]),)
     
@@ -289,7 +290,7 @@ class RnnModel_Attention:
           for idx in range(self.N_video_step):
             embeded = tf.expand_dims(image_embeded[:,idx,:], 1)
             _, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, embeded, initial_state= state)
-            image_states.append(state)
+            image_states.append(state[0])
           image_states = tf.stack(image_states, 1)
 
         # Decoding Stage
@@ -303,7 +304,7 @@ class RnnModel_Attention:
               decoder_outputs.append(output)
                         
         # Project N_hidden into vocab_size
-        decoder_outputs = tf.transpose(tf.squeeze(tf.stack(decoder_outputs)), [1, 0, 2])
+        decoder_outputs = tf.squeeze(tf.stack(decoder_outputs), 2)
         decoder_output_flatten = tf.reshape(decoder_outputs, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
@@ -345,7 +346,7 @@ class RnnModel_Attention:
           for idx in range(self.N_video_step):
             embeded = tf.expand_dims(image_embeded[:,idx,:], 1)
             _, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, embeded, initial_state= state)
-            image_states.append(state)
+            image_states.append(state[0])
           image_states = tf.stack(image_states, 1)
 
         # Decoding Stage
