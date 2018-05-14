@@ -275,6 +275,8 @@ class RnnModel_Attention:
                 shape=[self.batch_size, None])
         decoder_target = tf.placeholder(dtype=tf.int32,
                 shape=[self.batch_size, None])
+        decoder_mask = tf.placeholder(dtype= tf.int32,
+                shape= [self.batch_size, None])
 
         # Embeded image_feat size to N_hidden
         video_flatten = tf.reshape(video, (-1, self.image_dim))
@@ -304,7 +306,7 @@ class RnnModel_Attention:
               decoder_outputs.append(output)
                         
         # Project N_hidden into vocab_size
-        decoder_outputs = tf.squeeze(tf.stack(decoder_outputs), 2)
+        decoder_outputs = tf.squeeze(tf.stack(decoder_outputs, 1))
         decoder_output_flatten = tf.reshape(decoder_outputs, (-1, self.N_hidden))
         decoder_logits = tf.matmul(decoder_output_flatten, self.word_weight) + self.word_bias
         decoder_logits = tf.reshape(decoder_logits, (self.batch_size, -1, self.vocab_size))
