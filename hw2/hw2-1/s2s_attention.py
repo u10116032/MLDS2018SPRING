@@ -40,7 +40,7 @@ batch_size = 100
 N_hidden = 256
 N_epoch = 1000
 max_seq_len = 30
-save_step = 20
+save_step = 1
 
 params = {}
 params['cell_type'] = 'lstm'
@@ -73,7 +73,7 @@ def run_train():
                         N_video_step = train.feat_timestep,
                         N_caption_step = train.max_seq_len,
                         **params)
-        tf_video, tf_decoder_input, tf_decoder_target, loss, train_step = train_model.build_train_model()
+        tf_video, tf_decoder_input, tf_decoder_target, tf_decoder_mask, loss, train_step = train_model.build_train_model()
 
     with tf.Session(graph= graph) as sess:
         sess.run(tf.global_variables_initializer())
@@ -83,10 +83,15 @@ def run_train():
             batch_x, batch_y = train.next_batch(batch_size=batch_size)
 
             y = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
+            y_mask = np.zeros((batch_size, train.max_seq_len - 1))
             for i, caption in enumerate(batch_y):
                 y[i,:len(caption)] = caption
+                y_mask[i, :len(caption)] = 1.0
 
-            feed_dict = {tf_video: batch_x, tf_decoder_input: y[:, :-1], tf_decoder_target: y[:, 1:]}
+            feed_dict = {tf_video: batch_x,
+                         tf_decoder_input: y[:, :-1],
+                         tf_decoder_target: y[:, 1:],
+                         tf_decoder_mask: y_mask}
             _, train_loss = sess.run([train_step, loss], feed_dict=feed_dict)
             step += 1
             print('step: %d, train_loss: %f' % (step, train_loss))
@@ -154,8 +159,10 @@ def run_test(sampling):
             predictions = sess.run(captions, feed_dict= feed_dict)
             for word_idx in predictions:
                 word = inverse_dictionary[word_idx]
+                '''
                 if word == EOS_tag:
                     break
+                '''
                 caption['caption'].append(word)
 
             caption['caption'] = caption['caption'][1:]

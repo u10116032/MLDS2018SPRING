@@ -230,7 +230,7 @@ class RnnModel_Attention:
                                   shape= (self.vocab_size),
                                   initializer= tf.constant_initializer())
         self.saver = None
-        '''
+        
         self.states_weight = tf.get_variable('states_weight',
                                   shape= (self.N_hidden, 1),
                                   initializer= tf.truncated_normal_initializer(stddev= 0.02))
@@ -243,8 +243,8 @@ class RnnModel_Attention:
         self.key_bias = tf.get_variable('key_bias',
                                   shape= (self.N_hidden),
                                   initializer= tf.constant_initializer())
-        '''
-    '''
+        
+    
     def attention(self, image_states, key):
         key_flatten = tf.reshape(tf.squeeze(tf.stack(key)), (-1, self.N_hidden))
         key_scores = tf.matmul(key_flatten, self.key_weight) + self.key_bias
@@ -265,7 +265,7 @@ class RnnModel_Attention:
         weighted_states = tf.reduce_sum(tf.transpose(weighted_states,[0, 2, 1, 3]), 2)
         
         return (tf.contrib.rnn.LSTMStateTuple(c= weighted_states[0], h= weighted_states[1]),)
-    '''
+    
 
     def build_train_model(self):
         # Inputs
@@ -275,7 +275,7 @@ class RnnModel_Attention:
                 shape=[self.batch_size, None])
         decoder_target = tf.placeholder(dtype=tf.int32,
                 shape=[self.batch_size, None])
-        decoder_mask = tf.placeholder(dtype= tf.int32,
+        decoder_mask = tf.placeholder(dtype= tf.float32,
                 shape= [self.batch_size, None])
 
         # Embeded image_feat size to N_hidden
@@ -300,7 +300,7 @@ class RnnModel_Attention:
         with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):   
           decoder_outputs = []
           for idx in range(self.N_caption_step - 1):
-              # state = self.attention(image_states, state)
+              state = self.attention(image_states, state[0])
               embeded = tf.expand_dims(decoder_input_embeded[:, idx, :], 1)
               output, state = tf.nn.dynamic_rnn(self.decoder_multi_cells, embeded, initial_state= state)
               decoder_outputs.append(output)
@@ -315,6 +315,7 @@ class RnnModel_Attention:
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
                 labels= tf.one_hot(decoder_target, depth= self.vocab_size, dtype=tf.float32),
                 logits= decoder_logits)
+        stepwise_cross_entropy = tf.multiply(stepwise_cross_entropy, decoder_mask)
         
         loss = tf.reduce_mean(tf.reduce_sum(stepwise_cross_entropy, axis= 1))
         optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
@@ -322,7 +323,7 @@ class RnnModel_Attention:
         clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
         train_step = optimizer.apply_gradients(clipped_gradients)
 
-        return video, decoder_input, decoder_target, loss, train_step
+        return video, decoder_input, decoder_target, decoder_mask, loss, train_step
  
     
     def build_test_model(self, sampling= False):
@@ -355,7 +356,7 @@ class RnnModel_Attention:
         decoder_input_embeded = tf.nn.embedding_lookup(self.word_emdeded, decoder_input)
         with tf.variable_scope('decoder', reuse= tf.get_variable_scope().reuse):   
           for idx in range(self.N_caption_step):
-              # state = self.attention(image_states, state)
+              state = self.attention(image_states, state[0])
               decoder_output, state = tf.nn.dynamic_rnn(self.decoder_multi_cells, decoder_input_embeded, initial_state= state)
                             
               # Project N_hidden into vocab_size
