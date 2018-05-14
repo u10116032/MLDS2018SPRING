@@ -159,10 +159,9 @@ def run_test(sampling):
             predictions = sess.run(captions, feed_dict= feed_dict)
             for word_idx in predictions:
                 word = inverse_dictionary[word_idx]
-                '''
                 if word == EOS_tag:
                     break
-                '''
+                
                 caption['caption'].append(word)
 
             caption['caption'] = caption['caption'][1:]
