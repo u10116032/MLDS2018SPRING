@@ -138,7 +138,7 @@ class RnnModel_Attention:
     loss = tf.reduce_mean(tf.reduce_sum(stepwise_cross_entropy, axis= 1))
     optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
     gradients = optimizer.compute_gradients(loss)
-    clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
+    clipped_gradients = [(tf.clip_by_value(grad, -0.5, 0.5), var) for grad, var in gradients]
     train_step = optimizer.apply_gradients(clipped_gradients)
   
     return encoder_input, decoder_input, decoder_target, decoder_mask, loss, train_step
