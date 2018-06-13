@@ -40,7 +40,7 @@ batch_size = 100
 N_hidden = 256
 N_epoch = 1000
 max_seq_len = 30
-save_step = 1
+save_step = 20
 
 params = {}
 params['cell_type'] = 'lstm'
@@ -159,10 +159,8 @@ def run_test(sampling):
             predictions = sess.run(captions, feed_dict= feed_dict)
             for word_idx in predictions:
                 word = inverse_dictionary[word_idx]
-                '''
                 if word == EOS_tag:
                     break
-                '''
                 caption['caption'].append(word)
 
             caption['caption'] = caption['caption'][1:]
