@@ -108,7 +108,7 @@ def run_test(sampling):
   # Test Data Processing
   test = []
   test_max_seq_length = 0
-  with open(test_file) as data:
+  with open(test_file, encoding= 'utf8') as data:
     for sentence in data:
       sentence = re.sub(r'\n', '', sentence) 
       words = sentence.split()
@@ -163,7 +163,7 @@ def run_test(sampling):
 
 def write_result(data):
   folder = os.path.dirname(model_file) + '/'
-  with open(folder + 'result.txt', 'w') as f:
+  with open(folder + 'result.txt', 'w', encoding= 'utf8') as f:
     for sentence in data:
       for word in sentence:
         f.write('%s ' % word)

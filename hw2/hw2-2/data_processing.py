@@ -16,7 +16,7 @@ from collections import Counter
 def build_counter(data_path):
   counter = Counter()
   
-  with open(data_path, 'r') as data:
+  with open(data_path, 'r', encoding= 'utf8') as data:
     for sentence in data:
       sentence = re.sub(r'\n', '', sentence) 
       if sentence == '+++$+++':
@@ -50,7 +50,7 @@ def build_dict(counter, dictionary_path= None):
     dictionary[item[0]] = idx
   
   if dictionary_path is not None:
-    with open(dictionary_path, 'w') as f:
+    with open(dictionary_path, 'w', encoding= 'utf8') as f:
       for idx, item in enumerate(sorted_counter):
         f.write(str(idx) + ' ' + item[0] + ' ' + str(item[1]) + '\n')
   return dictionary
@@ -58,7 +58,7 @@ def build_dict(counter, dictionary_path= None):
 
 def read_dictionary(filepath):
   dictionary = {}
-  with open(filepath, 'r') as f:
+  with open(filepath, 'r', encoding= 'utf8') as f:
     for line in f:
       tokens = line.split()
       dictionary[tokens[1]] = int(tokens[0])
@@ -66,7 +66,7 @@ def read_dictionary(filepath):
 
 
 def translate_label(dictionary, train_data_path, train_label_path = None):
-  with open(train_data_path, 'r') as train_data:
+  with open(train_data_path, 'r', encoding= 'utf8') as train_data:
     label_data = []
     caption = []
     for sentence in train_data:
@@ -82,7 +82,7 @@ def translate_label(dictionary, train_data_path, train_label_path = None):
       label_data.append(caption)
       
   if train_label_path is not None:
-    with open(train_label_path, 'w') as train_label:
+    with open(train_label_path, 'w', encoding= 'utf8') as train_label:
       json.dump(label_data, train_label, indent=4)
   
   return label_data
@@ -92,7 +92,7 @@ def read_train(filename):
   if filename[-3:] == 'npy':
     data = np.load(filename)
   elif filename[-4:] == 'json':
-    with open(filename, 'r') as f:
+    with open(filename, 'r', encoding= 'utf8') as f:
       data = json.load(f)
   else:
     data = []
