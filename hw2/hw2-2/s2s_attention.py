@@ -33,8 +33,8 @@ UNK_tag = '<UNK>'
 
 ######### Parameters #########
 
-batch_size = 100
-N_hidden = 256
+batch_size = 50
+N_hidden = 512
 N_epoch = 1000
 max_seq_len = 30
 save_step = 20
@@ -42,7 +42,7 @@ save_step = 20
 params = {}
 params['cell_type'] = 'lstm'
 params['batch_size'] = batch_size
-params['learning_rate'] = 0.001
+params['learning_rate'] = 0.0001
 params['hidden_layers'] = 1
 params['dropout'] = 0.1
 
@@ -67,7 +67,7 @@ def run_train():
                 N_hidden = N_hidden,
                 N_caption_step = train.max_seq_len,
                 **params)
-    tf_encoder_input, tf_decoder_input, tf_decoder_target, tf_decoder_mask, loss, train_step = train_model.build_train_model()
+    tf_encoder_input, tf_encoder_mask, tf_decoder_input, tf_decoder_target, tf_decoder_mask, loss, train_step = train_model.build_train_model()
 
   with tf.Session(graph= graph) as sess:
     sess.run(tf.global_variables_initializer())
@@ -78,13 +78,16 @@ def run_train():
 
       x = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
       y = np.full((batch_size, train.max_seq_len), dictionary[EOS_tag])
+      x_mask = np.zeros((batch_size, train.max_seq_len))
       y_mask = np.zeros((batch_size, train.max_seq_len - 1))
       for i in range(batch_size):
         x[i,:len(batch_x[i])] = batch_x[i]
         y[i,:len(batch_y[i])] = batch_y[i]
+        x_mask[i, :len(batch_x[i])] = 1.0
         y_mask[i, :len(batch_y[i])] = 1.0
 
       feed_dict = {tf_encoder_input: x,
+                   tf_encoder_mask: x_mask,
                    tf_decoder_input: y[:, :-1],
                    tf_decoder_target: y[:, 1:],
                    tf_decoder_mask: y_mask}
@@ -154,7 +157,8 @@ def run_test(sampling):
         if word == EOS_tag:
           break
         caption.append(word)
-
+      if idx == 10:
+	      break
       caption = caption[1:]
       result.append(caption)
             
