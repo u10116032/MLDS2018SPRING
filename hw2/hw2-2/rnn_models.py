@@ -91,6 +91,8 @@ class RnnModel_Attention:
     # Inputs
     encoder_input = tf.placeholder(dtype=tf.int32,
             shape=[self.batch_size, self.N_caption_step])
+    encoder_mask = tf.placeholder(dtype= tf.float32,
+            shape= [self.batch_size, None])
     decoder_input = tf.placeholder(dtype=tf.int32,
             shape=[self.batch_size, None])
     decoder_target = tf.placeholder(dtype=tf.int32,
@@ -103,14 +105,15 @@ class RnnModel_Attention:
   
     # LSTM parameters
     state = self.encoder_multi_cells.zero_state(self.batch_size, dtype= tf.float32)
-  
+
     # Encoding Stage
     with tf.variable_scope('encoder', reuse= tf.get_variable_scope().reuse):
       input_states = []
       for idx in range(self.N_caption_step):
         embeded = tf.expand_dims(encoder_input_embeded[:,idx,:], 1)
         _, state = tf.nn.dynamic_rnn(self.encoder_multi_cells, embeded, initial_state= state)
-        input_states.append(state[0])
+        mask = tf.expand_dims(encoder_mask[:,idx], -1)
+        input_states.append((state[0][0] * mask, state[0][1] * mask))
       input_states = tf.stack(input_states, 1)
   
     # Decoding Stage
@@ -138,10 +141,10 @@ class RnnModel_Attention:
     loss = tf.reduce_mean(tf.reduce_sum(stepwise_cross_entropy, axis= 1))
     optimizer = tf.train.AdamOptimizer(learning_rate= self.learning_rate)
     gradients = optimizer.compute_gradients(loss)
-    clipped_gradients = [(tf.clip_by_value(grad, -0.5, 0.5), var) for grad, var in gradients]
+    clipped_gradients = [(tf.clip_by_value(grad, -0.1, 0.1), var) for grad, var in gradients]
     train_step = optimizer.apply_gradients(clipped_gradients)
   
-    return encoder_input, decoder_input, decoder_target, decoder_mask, loss, train_step
+    return encoder_input, encoder_mask, decoder_input, decoder_target, decoder_mask, loss, train_step
  
     
 
